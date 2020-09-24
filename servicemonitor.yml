@@ -1,0 +1,13 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kube-web-view
+  labels:
+    application: kube-web-view
+spec:
+  selector:
+    matchLabels:
+      application: kube-web-view
+  endpoints:
+  - port: web            # works for different port numbers as long as the name matches
+    interval: 10s

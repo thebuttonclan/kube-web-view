@@ -55,6 +55,55 @@ from kube_web import query_params as qp
 # import tracemalloc
 # tracemalloc.start()
 
+# from prometheus_client import start_http_server
+
+# start_http_server(8000)
+
+from prometheus_client import Counter, Gauge, Histogram
+import prometheus_client
+
+async def metrics(request):
+    resp = web.Response(body=prometheus_client.generate_latest())
+    resp.content_type = 'text/plain'
+    return resp
+
+def setup_metrics(app, app_name):
+    app['REQUEST_COUNT'] = Counter(
+      'requests_total', 'Total Request Count',
+      ['app_name', 'method', 'endpoint', 'http_status']
+    )
+    app['REQUEST_LATENCY'] = Histogram(
+        'request_latency_seconds', 'Request latency',
+        ['app_name', 'endpoint']
+    )
+    app['REQUEST_IN_PROGRESS'] = Gauge(
+        'requests_in_progress_total', 'Requests in progress',
+        ['app_name', 'endpoint', 'method']
+    )
+    app.middlewares.insert(0, prom_middleware(app_name))
+    app.router.add_get("/metrics", metrics)
+
+def prom_middleware(app_name):
+    @asyncio.coroutine
+    def factory(app, handler):
+        @asyncio.coroutine
+        def middleware_handler(request):
+            try:
+                request['start_time'] = time.time()
+                request.app['REQUEST_IN_PROGRESS'].labels(
+                            app_name, request.path, request.method).inc()
+                response = yield from handler(request)
+                resp_time = time.time() - request['start_time']
+                request.app['REQUEST_LATENCY'].labels(app_name, request.path).observe(resp_time)
+                request.app['REQUEST_IN_PROGRESS'].labels(app_name, request.path, request.method).dec()
+                request.app['REQUEST_COUNT'].labels(
+                            app_name, request.method, request.path, response.status).inc()
+                return response
+            except Exception as ex:
+                raise
+        return middleware_handler
+    return factory
+
 logger = logging.getLogger(__name__)
 
 HEALTH_PATH = "/health"
@@ -1310,6 +1359,16 @@ async def get_search(request, session):
         "is_all_namespaces": is_all_namespaces,
     }
 
+# @routes.get("/metrics")
+# async def handle_metrics(request):
+#     """
+#     Negotiate a response format by inspecting the ACCEPTS headers and selecting
+#     the most efficient format. Render metrics in the registry into the chosen
+#     format and return a response.
+#     """
+#     content, http_headers = render(app.registry, [request.headers.get("accept")])
+#     return Response(content, headers=http_headers)
+
 
 @routes.get(HEALTH_PATH)
 async def get_health(request):
@@ -1535,6 +1594,7 @@ def get_app(cluster_manager, config):
 
     app.middlewares.append(error_handler)
     app.middlewares.append(trailing_slash)
+    setup_metrics(app, "webapp_1")
 
     app[CLUSTER_MANAGER] = cluster_manager
     app[CONFIG] = config
