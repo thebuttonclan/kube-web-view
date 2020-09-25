@@ -51,16 +51,12 @@ from kube_web import jinja2_filters
 from kube_web import joins
 from kube_web import kubernetes
 from kube_web import query_params as qp
+from prometheus_client import Counter, Gauge, Histogram
+import prometheus_client
 
 # import tracemalloc
 # tracemalloc.start()
 
-# from prometheus_client import start_http_server
-
-# start_http_server(8000)
-
-from prometheus_client import Counter, Gauge, Histogram
-import prometheus_client
 
 async def metrics(request):
     resp = web.Response(body=prometheus_client.generate_latest())

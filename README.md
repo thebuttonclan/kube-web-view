@@ -87,3 +87,7 @@ To start the Python web server locally with the default kubeconfig (`~/.kube/con
 ```
 make run
 ```
+
+## Prometheus
+
+Working version: prometheus helm chart in default with no variables set. Kube web view and prometheus standalon in apps namespace.

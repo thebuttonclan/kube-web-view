@@ -12,7 +12,7 @@ spec:
       app: test-app
   namespaceSelector:
     matchNames:
-    - apps
+    - test
   endpoints: 
   - port: web
     interval: 30s
